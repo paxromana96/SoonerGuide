@@ -1,12 +1,12 @@
-from makeSlotsForBuildingNames import make_slots_for_blding_names
-from makeSlotsForRoomNames import make_slots_for_room_names
-from Lambda import ROOM_NAME_SLOT_KEY, BUILDING_NAME_SLOT_KEY
-from alexa_synonyms import union_room_synonyms
-from external_building_synonyms import external_building_synonyms
 import json
 
+from Lambda import ROOM_NAME_SLOT_KEY, BUILDING_NAME_SLOT_KEY
+from external_building_synonyms import buildings
+from room_directions import union_rooms
+from slot_utils import make_slots_for_names_of_locations
 
-def makeAlexaInteractionModelSlotTypesArray(map_of_slot_name_to_synonyms):
+
+def make_alexa_interaction_model_slot_types_array(map_of_slot_name_to_synonyms):
     return [
         {
             "name": slot_name,
@@ -17,9 +17,9 @@ def makeAlexaInteractionModelSlotTypesArray(map_of_slot_name_to_synonyms):
 
 
 if __name__ == '__main__':
-    print(json.dumps(makeAlexaInteractionModelSlotTypesArray(
+    print(json.dumps(make_alexa_interaction_model_slot_types_array(
         {
-            ROOM_NAME_SLOT_KEY: make_slots_for_room_names(union_room_synonyms),
-            BUILDING_NAME_SLOT_KEY: make_slots_for_blding_names(external_building_synonyms)
+            ROOM_NAME_SLOT_KEY: make_slots_for_names_of_locations(union_rooms),
+            BUILDING_NAME_SLOT_KEY: make_slots_for_names_of_locations(buildings)
         }
     )))

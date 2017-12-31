@@ -1,39 +1,43 @@
 import unittest
-from src.external_building_directions import external_building_directions_relative_to_landmarks
-from src.external_building_synonyms import external_building_synonyms
+
 from src.Lambda import on_intent, BUILDING_NAME_SLOT_KEY, BUILDING_DIRECTIONS_INTENT_NAME
+from src.external_building_synonyms import buildings
 
 
-def createIntentForLookingUpBuilding(user_provided_building_name):
-    return {'intent': {'name': BUILDING_DIRECTIONS_INTENT_NAME, 'slots': {BUILDING_NAME_SLOT_KEY: {'value': user_provided_building_name}}},
+def create_intent_for_looking_up_building_by_name(user_provided_building_name):
+    return {'intent': {'name': BUILDING_DIRECTIONS_INTENT_NAME,
+                       'slots': {BUILDING_NAME_SLOT_KEY: {'value': user_provided_building_name}}},
             'requestId': ""}
 
 
 class BuildingDirectionsTestCase(unittest.TestCase):
     def test_allBuildingsWithSynonymsHaveDirections(self):
-        for canonical_building_name in external_building_synonyms:
-            self.assertTrue(canonical_building_name in external_building_directions_relative_to_landmarks.keys(),
-                            "Building " + canonical_building_name + " is missing directions")
-
-    def test_allBuildingsWithDirectionsHaveSynonyms(self):
-        for canonical_building_name in external_building_directions_relative_to_landmarks:
-            self.assertTrue(canonical_building_name in external_building_synonyms.keys(),
-                            "Building " + canonical_building_name + " has directions but no definition of synonyms")
+        for building in buildings:
+            self.assertIsNotNone(building.get_directions(),
+                                 "Building {building!s} is missing directions".format(building=building))
 
     def test_firingIntentForBuildingReturnsExpectedDirections(self):
-        for canonical_building_name in external_building_directions_relative_to_landmarks:
-            response = on_intent(createIntentForLookingUpBuilding(canonical_building_name), {"sessionId": ""})
-            self.assertEqual(external_building_directions_relative_to_landmarks[canonical_building_name],
+        for building in buildings:
+            response = on_intent(
+                create_intent_for_looking_up_building_by_name(building.get_names().get_canonical().replace('_', ' ')),
+                {"sessionId": ""})
+            self.assertEqual(building.get_directions(),
                              response['response']['outputSpeech']['text'],
-                             "Building  " + canonical_building_name + " gave the wrong directions")
+                             "Building {building!s} gave wrong/unexpected directions".format(building=building))
 
     def test_firingIntentForBuildingSynonymsReturnsExpectedDirections(self):
-        for canonical_building_name in external_building_synonyms:
-            for room_synonym in external_building_synonyms[canonical_building_name]:
-                response = on_intent(createIntentForLookingUpBuilding(room_synonym), {"sessionId": ""})
-                self.assertEqual(external_building_directions_relative_to_landmarks[canonical_building_name],
+        for building in buildings:
+            for room_synonym in building.get_names():
+                response = on_intent(create_intent_for_looking_up_building_by_name(room_synonym), {"sessionId": ""})
+                self.assertEqual(building.get_directions(),
                                  response['response']['outputSpeech']['text'],
-                                 "Building " + canonical_building_name + " gave the wrong directions using the synonym " + room_synonym)
+                                 "Building {building!s} gave wrong/unexpected directions using the synonym {synonym}"
+                                 .format(building=building, synonym=room_synonym))
+
+    def test_firingIntentForLookingUpMissingBuildingReturnsSomeText(self):
+        response = on_intent(create_intent_for_looking_up_building_by_name("missing building"), {"sessionId": ""})
+        self.assertIsNotNone(response['response']['outputSpeech']['text'],
+                             "No text given to indicate we could not find the \"missing building\"")
 
 
 if __name__ == '__main__':

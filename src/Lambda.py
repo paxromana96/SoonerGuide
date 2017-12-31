@@ -9,10 +9,9 @@ http://amzn.to/1LGWsLG
 
 from __future__ import print_function
 
-from alexa_synonyms import union_room_synonyms
-from external_building_synonyms import external_building_synonyms
-from external_building_directions import external_building_directions_relative_to_landmarks
-from room_directions import union_room_directions
+from external_building_synonyms import buildings
+from name_lookup_utils import get_location_matching_name
+from room_directions import union_rooms
 
 # --------------- Helpers that build all of the responses ----------------------
 ROOM_DIRECTIONS_INTENT_NAME = "WhereIsMyRoom"
@@ -82,46 +81,14 @@ def handle_session_end_request():
         card_title, speech_output, None, should_end_session))
 
 
-def get_canonical_union_room_name(intent_value_for_union_room):
-    return get_canonical_name(intent_value_for_union_room, union_room_synonyms)
-
-
-def get_canonical_building_name(intent_value_for_building):
-    return get_canonical_name(intent_value_for_building, external_building_synonyms)
-
-
-def remove_prefix(str, prefix):
-    if str.startswith(prefix):
-        return str[len(prefix):]
-    return str
-
-
-def get_canonical_name(intent_value_for_location, canonical_name_synonyms):
-    return get_key_from_multimap(remove_prefix(intent_value_for_location.lower(), prefix="the "), map=canonical_name_synonyms)
-
-
-def get_key_from_multimap(value, map):
-    """
-    Returns the key in map that includes value in its values, or matches the value with spaces instead of underscores.
-    It returns false if nothing is matched.
-
-    For example,
-    get_key_from_multimap(<value>, {"my_key": ["value 1", "value 2"]})
-
-    would return "my_key" if value was "my key", "my_key", "value 1", or "value 2", and would return False if value was "value 3"
-    """
-    for key in map:
-        if (value.replace(" ", "_") == key) or (value == key.replace("_", " ")) or (value in map[key]):
-            return key
-    return False
-
-
 def get_directions_for_intent(intent, session):
     """Creates an appropriate response, given intent and session information directly from Alexa"""
 
-    room_name = get_canonical_union_room_name(intent['slots'][ROOM_NAME_SLOT_KEY]['value'])
+    matching_room = get_location_matching_name(intent['slots'][ROOM_NAME_SLOT_KEY]['value'], union_rooms)
 
-    if room_name is False or room_name not in union_room_directions:  # meaning we can't find what room they're talking about
+    if matching_room is False or matching_room not in union_rooms:
+        # meaning we can't find what room they're talking about
+        # TODO: generalize this to search through all locations
         # TODO: reprompt them for the room name they meant to say
         return build_response(session_attributes={},
                               speechlet_response=build_speechlet_response(
@@ -131,31 +98,32 @@ def get_directions_for_intent(intent, session):
                                   reprompt_text=None,
                                   should_end_session=True))
     else:  # if we COULD get a canonical room_name
-        return build_directions_response_from_directions_source(room_name, union_room_directions)
+        return build_directions_response_from_directions_source(destination=matching_room, locations=union_rooms)
 
 
 # TODO: Check to see if the intent works properly
 def get_directions_for_blding_intent(intent, session):
-    blding_name = get_canonical_building_name(intent['slots'][BUILDING_NAME_SLOT_KEY]['value'])
+    matching_building = get_location_matching_name(intent['slots'][BUILDING_NAME_SLOT_KEY]['value'], buildings)
 
-    if blding_name is False or blding_name not in external_building_directions_relative_to_landmarks:
+    if matching_building is False or matching_building not in buildings:
         # TODO: reprompt them for the building they meant to say
         return build_response(session_attributes={},
                               speechlet_response=build_speechlet_response(
                                   title="Directions to \"" + intent['slots'][BUILDING_NAME_SLOT_KEY]['value'] + "\"",
                                   output=(
-                                  "I don't know where the building called " + intent['slots'][BUILDING_NAME_SLOT_KEY][
-                                      'value'] + " is."),
+                                          "I don't know where the building called " +
+                                          intent['slots'][BUILDING_NAME_SLOT_KEY][
+                                              'value'] + " is."),
                                   reprompt_text=None,
                                   should_end_session=True))
     else:  # if we COULD get a canonical building_name
-        return build_directions_response_from_directions_source(blding_name,
-                                                                external_building_directions_relative_to_landmarks)
+        return build_directions_response_from_directions_source(destination=matching_building,
+                                                                locations=buildings)
 
 
-def build_directions_response_from_directions_source(canonical_location_name, directions_map):
-    speech_output = directions_map[canonical_location_name]
-    card_title = "Directions to " + canonical_location_name.replace('_', ' ')
+def build_directions_response_from_directions_source(destination, locations):
+    speech_output = destination.get_directions()
+    card_title = "Directions to " + destination.get_names().get_canonical().replace('_', ' ')
     reprompt_text = None
     should_end_session = True
 
